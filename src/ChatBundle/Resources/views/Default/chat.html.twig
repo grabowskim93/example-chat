@@ -1,0 +1,75 @@
+{% extends 'ChatBundle:Default:base.html.twig' %}
+
+{% block body %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js" type="text/javascript"></script>
+
+    <script src="{{ asset('bundles/js/chat.js') }}" type="text/javascript"></script>
+    {#<script src="{{ asset('bundles/js/chat_toggle.js') }}" type="text/javascript"></script>#}
+    <p>
+    </p>
+    <p>
+        Ścieżka do logowania:
+        <a href="{{ path('login') }}">Logowanie</a>.
+    </p>
+    <p>
+        Ścieżka do rejestracji:
+        <a href="{{ path('user_registration') }}">Rejestracja</a>.
+    </p>
+    <p>
+        Wyloguj:
+        <a href="{{ path('logout') }}">Wyloguj</a>
+    </p>
+
+    {% for row in users %}
+        <input type='button' id='hideshow' class="btn show-chat" value='{{ row.username }}'><img src="{{ asset('bundles/images/available.png') }}"></input>
+        </br>
+        </br>
+    {% endfor %}
+
+    <script>
+        $(document).ready(function(){
+            $(".chat_window").hide();
+            $(".show-chat").show();
+
+            $('.show-chat').click(function(){
+                $(".chat_window").slideToggle();
+            });
+
+            $('.btn-close').click(function () {
+               $(".chat_window").hide();
+            });
+
+        });
+    </script>
+
+
+
+    <div class="chat_window" style="display: none;">
+        <div class="top_menu">
+            <div class="buttons">
+                <div class="button close btn-close"></div>
+               {# <div class="button minimize"></div>
+                <div class="button maximize"></div>#}
+            </div>
+            <div class="title">Chat</div>
+        </div>
+        <ul class="messages"></ul>
+        <div class="bottom_wrapper clearfix">
+            <div class="message_input_wrapper">
+                <input class="message_input" placeholder="Type your message here..." />
+            </div>
+            <div class="send_message">
+                <div class="icon"></div>
+                <div class="text">Send</div>
+            </div>
+        </div>
+    </div>
+    <div class="message_template">
+        <li class="message">
+            <div class="avatar"></div>
+            <div class="text_wrapper">
+                <div class="text"></div>
+            </div>
+        </li>
+    </div>
+{% endblock %}

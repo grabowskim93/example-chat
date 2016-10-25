@@ -1,0 +1,423 @@
+{% extends 'ChatBundle:Default:base.html.twig' %}
+
+{% block body %}
+    <div class="row">
+        <div class="col-xs-12 col-sm-4">
+             
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-xs-12 col-sm-4">
+            <div class="user-box">
+                <h2>Witaj! {{user.username}}</h2>
+                <a href="{{ path('logout') }}">Wyloguj</a>
+                <div class="hidden" data-loggedId="{{user.id}}"></div>
+            </div>
+            <div class="user-prototype hidden">
+                <li class="list-group-item"><a href="#" class="btn show-chat" data-id="" data-socketId=""><img src="{{ asset('bundles/images/available.png') }}"> <span class="user-name"></span>  <span class="messages-unread"></span></a></li>
+            </div>
+            <h4 class="users-logged">Obecnie zalogowani</h4>
+            <ul class="list-group list-users">
+                {% for activeUser in users %}
+                    {% if activeUser.id != user.id %}
+                        <li class="list-group-item"><a href="#" class="btn show-chat" data-id="{{activeUser.id}}" data-socketId="{{activeUser.socketId}}"><img src="{{ asset('bundles/images/available.png') }}"> <span class="user-name">{{ activeUser.username }}</span> {% if activeUser.unreadMessages != '0' %}<span class="messages-unread">{{ activeUser.unreadMessages }}</span>{% endif %}</a></li>
+                    {% endif %}    
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="col-xs-12 col-sm-8">
+            <div class="chat_window clear-chat-window" id="privateChatWindow" style="display: none;">
+                <div class="top_menu">
+                    <div class="buttons">
+                        <div class="button close btn-close"></div>
+                        {# <div class="button minimize"></div>
+                         <div class="button maximize"></div>#}
+                    </div>
+                    <div class="title">Chat</div>
+                </div>
+                    <ul class="messages">
+                    </ul>
+                <div class="bottom_wrapper clearfix">
+                    <div class="message_input_wrapper">
+                        <input class="message_input" placeholder="Wprowadź wiadomość" />
+                    </div>
+                    <div class="send_message" id="sendPrivateMessage" data-receiverId="">
+                        <div class="icon"></div>
+                        <div class="text">Wyślij</div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="input-group">
+                      <span class="input-group-btn">
+                        <p>#prograowanie, #php</p>
+                        <button class="btn btn-default" type="button">Szukaj!</button>
+                      </span>
+                      <input type="text" class="form-control" placeholder="Szukaj tagów...">
+                    </div><!-- /input-group -->
+                </div><!-- /.col-lg-6 -->
+            </div>
+            
+                    
+           <!-- msg template -->
+           <div class="message_template">
+                <li class="message">
+                    <div class="avatar"></div>
+                    <div class="text_wrapper">
+                        <div class="text"></div>
+                    </div>
+                </li>
+            </div>
+        </div>
+    </div>
+            
+
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ asset('gos_web_socket_client.js') }}"></script>
+    <script src="{{ asset('autobahn.min.js') }}"></script>
+    <script src="{{ asset('bundles/js/chat.js') }}"></script>
+    <script>
+        var socketConnected = false;
+        var allMessagesLoaded = false;
+        $(document).ready(
+            function()
+            {   
+                setInterval(
+                    function()
+                    {
+                        checkActiveUsers();
+                    }
+                ,3000);
+                
+                //connect
+                var websocket = WS.connect("ws://192.81.217.88:8080");
+                
+                websocket.on("socket/connect", 
+                    function (session)
+                    {
+                        session.subscribe("acme/channel", 
+                            function(uri, payload)
+                            {
+                                console.log(payload);
+                                
+                                if(payload.sessionId !== undefined)
+                                {
+                                    //connecting socketId to user
+                                    var url = $("[data-ajax]").attr("data-ajax");
+                                    var id = $("[data-loggedId]").attr("data-loggedId");
+                                    $.post(url,
+                                        {
+                                            "mode":"connectSocket",
+                                            "id":id,
+                                            "socketId":payload.sessionId
+                                        },
+                                        function(response)
+                                        {
+                                            if(response.status)
+                                            {
+                                                socketConnected = true;
+                                                //session.publish("acme/channel", {msg: "lalalal", reciverId :7, senderId: 6});
+                                            }
+                                                
+                                        }
+                                    ,"json");
+                                }
+                                if(payload.messagePack !== undefined)
+                                {
+                                    var chatWindow = $("#privateChatWindow");
+                                    var receiver = $("#sendPrivateMessage").attr("data-receiverId");
+                                    
+                                    if(chatWindow.css("display") == "block" && receiver == payload.messagePack.senderId)
+                                    {
+                                        var url = $("[data-ajax]").attr("data-ajax");
+                                        $.post(url,
+                                            {
+                                                "mode":"tagMessageAsRead",
+                                                "messageId":payload.messagePack.messageId
+                                            },
+                                            function(response)
+                                            {
+                                                if(!response.status)
+                                                    console.log("Błąd oznaczania wiadomości");
+                                            }
+                                        ,"json");
+                                            
+                                        var messages = $('.messages');
+                                        var mess = new Message({
+                                            text: payload.messagePack.content,
+                                            message_side: 'left'
+                                        })
+
+                                        mess.draw();
+                                        messages.animate({ scrollTop: messages.prop('scrollHeight') }, 300);
+                                    }
+                                }
+                                //shows chat winndow
+                                $('.list-users').on('click',".show-chat",
+                                    function(e) 
+                                    {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        e.stopImmediatePropagation();
+                                        allMessagesLoaded = false;
+                                        
+                                        if(socketConnected)
+                                        {
+                                            var reciverId = $(this).attr("data-id");
+                                            var id = $("[data-loggedId]").attr("data-loggedId");
+                                            var url = $("[data-ajax]").attr("data-ajax");
+                                            
+                                            var reciverSocket = $(this).attr("data-socketId");
+                                            $("#sendPrivateMessage").attr("data-receiverId",reciverId);
+                                            $("#sendPrivateMessage").attr("data-receiverSocket",reciverSocket);
+                                            $("#privateChatWindow .title").text($("span.user-name",$(this)).text());
+                                            
+                                            $.post(url,
+                                                {
+                                                    "mode":"getConversation",
+                                                    "id":id,
+                                                    "receiver":reciverId,
+                                                },
+                                                function(response)
+                                                {
+                                                    if(response.status !== undefined)
+                                                    {
+                                                        console.log("Błąd pobierania wiadomości")
+                                                    }
+                                                    else if(response.messages !== undefined)
+                                                    {
+                                                        $(".messages li").remove();
+
+                                                        for(var i = response.messages.length - 1; i >= 0; i--)
+                                                        {
+                                                            var side = (response.messages[i].sender == id)? 'right':'left'
+                                                            var mess = new Message({
+                                                                text: response.messages[i].message,
+                                                                message_side: side
+                                                            })
+
+                                                            mess.draw();
+                                                            
+                                                        }
+                                                        allMessagesLoaded = (response.allGiven)? true : false;
+                                                        $(".messages").scrollTop(500);
+                                                    }
+                                                    
+                                                }
+                                            ,"json");
+                                            
+                                           $(".messages li").remove(); 
+                                           $("#privateChatWindow").fadeIn();
+                                        }  
+                                    }
+                                );
+                                $('.btn-close').click(
+                                    function(e) 
+                                    {
+                                        e.preventDefault();
+                                        $("#sendPrivateMessage").attr("data-receiverId","")
+                                        $("#privateChatWindow").fadeOut();
+                                        allMessagesLoaded = false;
+                                    }
+                                );
+                                $("#sendPrivateMessage").click(
+                                    function(e)
+                                    {
+                                        
+                                        e.stopImmediatePropagation();
+                                        console.log("1")
+                                        if(socketConnected)
+                                        {
+                                            var message = $(".message_input");
+                                            
+                                            var receiver = $(this).attr("data-receiverId");
+                                            var receiverSocket = $(this).attr("data-receiverSocket");
+                                            var sender = $("[data-loggedId]").attr("data-loggedId");
+                                            
+                                            if(receiver != "" && sender != "")
+                                            {
+                                                session.publish("acme/channel", {content: message.val(), reciverId :receiver, senderId: sender,reciverSocket:receiverSocket});
+                                                
+                                                var messages = $('.messages');
+                                                var mess = new Message({
+                                                    text: message.val(),
+                                                    message_side: 'right'
+                                                })
+                                                
+                                                mess.draw();
+                                                messages.animate({ scrollTop: messages.prop('scrollHeight') }, 300);
+                                                message.val("");
+                                            }
+                                        }
+                                    }
+                                );
+                                $(".message_input").keyup(
+                                    function(e)
+                                    {
+                                        
+                                        e.stopImmediatePropagation();
+                                        console.log("1")
+                                        if(socketConnected && e.which === 13)
+                                        {
+                                            var message = $(".message_input");
+                                            
+                                            var receiver = $("#sendPrivateMessage").attr("data-receiverId");
+                                            var receiverSocket = $("#sendPrivateMessage").attr("data-receiverSocket");
+                                            var sender = $("[data-loggedId]").attr("data-loggedId");
+                                            
+                                            if(receiver != "" && sender != "")
+                                            {
+                                                session.publish("acme/channel", {content: message.val(), reciverId :receiver, senderId: sender,reciverSocket:receiverSocket});
+                                                
+                                                var messages = $('.messages');
+                                                var mess = new Message({
+                                                    text: message.val(),
+                                                    message_side: 'right'
+                                                })
+                                                
+                                                mess.draw();
+                                                messages.animate({ scrollTop: messages.prop('scrollHeight') }, 300);
+                                                message.val("");
+                                            }
+                                        }
+                                    }
+                                );
+                                $(".messages").scroll(
+                                    function(e)
+                                    {
+                                        e.stopImmediatePropagation();
+                                        var scroll = $(this).scrollTop();
+                                        
+                                        if(scroll == 0 && !allMessagesLoaded)
+                                        {
+                                            var reciverId = $("#sendPrivateMessage").attr("data-receiverId");
+                                            var id = $("[data-loggedId]").attr("data-loggedId");
+                                            var url = $("[data-ajax]").attr("data-ajax");
+                                            
+                                            var displayedMessages = $("li",$(this));
+                                            
+                                            $.post(url,
+                                                {
+                                                    "mode":"getConversation",
+                                                    "id":id,
+                                                    "receiver":reciverId,
+                                                    "limit":(displayedMessages.length + 5)
+                                                },
+                                                function(response)
+                                                {
+                                                    if(response.status !== undefined)
+                                                    {
+                                                        console.log("Błąd pobierania wiadomości")
+                                                    }
+                                                    else if(response.messages !== undefined)
+                                                    {
+                                                        $(".messages li").remove();
+
+                                                        for(var i = response.messages.length - 1; i >= 0; i--)
+                                                        {
+                                                            var side = (response.messages[i].sender == id)? 'right':'left'
+                                                            var mess = new Message({
+                                                                text: response.messages[i].message,
+                                                                message_side: side
+                                                            })
+
+                                                            mess.draw();
+                                                            
+                                                        }
+                                                        allMessagesLoaded = (response.allGiven)? true : false;
+                                                       
+                                                        var msgs = $(".messages");
+                                                        var scroll = 200;
+                                                        
+                                                        console.log(scroll);
+                                                        msgs.scrollTop(scroll);
+                                                       
+                                                    }
+                                                    
+                                                }
+                                            ,"json");
+                                        }
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+                //disconnect
+                websocket.on("socket/disconnect", 
+                    function(error)
+                    {
+                        console.log("Disconnected for " + error.reason + " with code " + error.code);
+                        socketConnected = false;
+                    }
+                );
+            }
+        );
+        function checkSocket()
+        {
+            setInterval(
+                    function()
+            {
+                console.log("socket connected "+socketConnected);
+            },5000)
+        }
+        
+        function Message (arg) 
+        {
+            this.text = arg.text, this.message_side = arg.message_side;
+            this.draw = function (_this) {
+                return function () {
+                    var $message;
+                    $message = $($('.message_template').clone().html());
+                    $message.addClass(_this.message_side).find('.text').html(_this.text);
+                    $('.messages').append($message);
+                    return setTimeout(function () {
+                        return $message.addClass('appeared');
+                    }, 0);
+                };
+            }(this);
+            return this;
+        };
+        function checkActiveUsers()
+        {
+            var url = $("[data-ajax]").attr("data-ajax");
+            var id = $("[data-loggedId]").attr("data-loggedId");
+            $.post(url,
+                {
+                    "mode":"getActiveUsers",
+                    "id":id
+                },
+                function(response)
+                {
+                    if(response.status !== undefined)
+                    {
+                        console.log("Błąd pobierania użytkowników")
+                    }
+                    else if(response.users !== undefined)
+                    {
+                        var prototype = $(".user-prototype").clone();
+                        $(".list-users li").remove();
+                        var ul = $(".list-users");
+                        var userLoggedId = $("[data-loggedId]").attr("data-loggedId");
+
+                        for(var i = 0; i < response.users.length; i++)
+                        {
+                            if(response.users[i].id != userLoggedId)
+                            {
+                                $("a",prototype).attr("data-id",response.users[i].id);
+                                $("a",prototype).attr("data-socketId",response.users[i].socketId);
+                                $("span.user-name",prototype).text(response.users[i].username);
+                                if(response.users[i].unreadMessages != "0")
+                                    $("span.messages-unread",prototype).text(response.users[i].unreadMessages).css("display","block");
+                                else
+                                    $("span.messages-unread",prototype).text("").css("display","none");
+                                ul.append(prototype.html());
+                            }
+                        }
+                    }
+                }
+            ,"json");
+        }
+    </script>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'ChatBundle:Default:base.html.twig' %}
+
+{% block body %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.4/jquery.min.js" type="text/javascript"></script>
+
+    <script src="{{ asset('bundles/js/chat.js') }}" type="text/javascript"></script>
+    {#<script src="{{ asset('bundles/js/chat_toggle.js') }}" type="text/javascript"></script>#}
+    <p>
+    </p>
+    <p>
+        Ścieżka do logowania:
+        <a href="{{ path('login') }}">Logowanie</a>.
+    </p>
+    <p>
+        Ścieżka do rejestracji:
+        <a href="{{ path('user_registration') }}">Rejestracja</a>.
+    </p>
+    <p>
+        Wyloguj:
+        <a href="{{ path('logout') }}">Wyloguj</a>
+    </p>
+
+
+
+    {#<h1 id="history"></h1>#}
+    <textarea id="request" cols="20" rows="4"></textarea>
+
+    <script>
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[\[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                    results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+
+        var foo = getParameterByName('go');
+        var data = "Avs";
+
+        $.ajax({
+            type: "POST",
+            url: "{{ path('_recherche_ajax') }}",
+            data: data,
+            success: function (data, dataType) {
+                alert(foo);
+            },
+
+            error: function (XMLHttpRequest, textStatus, errorThrown) {
+                alert('Error : ' + errorThrown);
+            }
+        });
+    </script>
+{% endblock %}

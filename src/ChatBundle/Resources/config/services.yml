@@ -1,0 +1,17 @@
+services:
+    chat_hello.topic_sample_service:
+        class: ChatBundle\Topic\ChatTopic
+        arguments: ["@doctrine.orm.entity_manager"]
+        tags:
+            - { name: gos_web_socket.topic }
+
+    acme_hello.rpc_sample_service:
+        class: ChatBundle\Rpc\ChatRpc
+        tags:
+            - { name: gos_web_socket.rpc }
+
+    chat.user_activity_listener:
+        class: ChatBundle\EventListener\UserActivityListener
+        arguments: ["@doctrine.orm.entity_manager", "@security.token_storage"]
+        tags:
+            - { name: kernel.event_listener, event: 'gos_web_socket.client_disconnected', method: onClientDisconnect }
